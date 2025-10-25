@@ -16,18 +16,18 @@ A comprehensive, production-grade system for analyzing relationships between exc
 
 Our pipeline automatically fetches and processes data from multiple sources:
 
-![Time Series Levels](data/out/plots/levels.png)
+![Time Series Levels](docs/images/levels.png)
 *Figure 1: Raw time series data showing SUZB3 stock price, USD/BRL exchange rate (PTAX), interest rate (SELIC), pulp prices, and climate indicators (2020-2025)*
 
-![Returns Distribution](data/out/plots/returns.png)
+![Returns Distribution](docs/images/returns.png)
 *Figure 2: Log returns for all key variables, highlighting volatility patterns and co-movement*
 
 ### Correlation Analysis
 
-![Correlation Heatmap](data/out/plots/correlation_heatmap.png)
+![Correlation Heatmap](docs/images/correlation_heatmap.png)
 *Figure 3: Correlation matrix revealing relationships between variables. Note the strong connection between PTAX and pulp prices (BRL terms)*
 
-![Rolling Correlation](data/out/plots/rolling_corr_suzb_r_pulp_brl_r.png)
+![Rolling Correlation](docs/images/rolling_corr_suzb_r_pulp_brl_r.png)
 *Figure 4: Rolling 60-day correlation between SUZB3 returns and pulp prices, showing time-varying relationships*
 
 ---
@@ -52,13 +52,13 @@ Our pipeline automatically fetches and processes data from multiple sources:
 | **IC** | 0.63 | 0.84 | N/A |
 | **Hit Ratio** | 4.1% | 4.0% | 0.0% |
 
-![Predictions vs Actual](data/out/plots/pred_vs_actual_splits.png)
+![Predictions vs Actual](docs/images/pred_vs_actual_splits.png)
 *Figure 5: Model predictions vs actual returns across train/validation/test splits. Clear temporal separation ensures no data leakage.*
 
-![Scatter Plot](data/out/plots/scatter_actual_vs_pred.png)
+![Scatter Plot](docs/images/scatter_actual_vs_pred.png)
 *Figure 6: Scatter plot of predicted vs actual returns, showing model fit quality*
 
-![Synthetic vs Actual](data/out/plots/synthetic_vs_actual.png)
+![Synthetic vs Actual](docs/images/synthetic_vs_actual.png)
 *Figure 7: Synthetic index tracking actual SUZB3 prices over time*
 
 ---
@@ -67,7 +67,7 @@ Our pipeline automatically fetches and processes data from multiple sources:
 
 ### Model Health Checks
 
-![Residual Diagnostics](data/out/plots/residual_diagnostics.png)
+![Residual Diagnostics](docs/images/residual_diagnostics.png)
 *Figure 8: Comprehensive residual analysis including distribution, Q-Q plot, ACF, and time series*
 
 **Diagnostic Test Results:**
@@ -87,15 +87,15 @@ Our pipeline automatically fetches and processes data from multiple sources:
 - **Window**: Rolling 60-day mean/std
 - **Transaction Cost**: 0.1% per trade
 
-![Z-Score Analysis](data/out/plots/zscore_analysis.png)
+![Z-Score Analysis](docs/images/zscore_analysis.png)
 *Figure 9: Z-score time series with trading signals (green = long, red = short) and distribution*
 
-![Trading Signals](data/out/plots/signals.png)
+![Trading Signals](docs/images/signals.png)
 *Figure 10: Trading signals overlaid on SUZB3 price chart*
 
 ### Backtest Results
 
-![Backtest PnL](data/out/plots/backtest_pnl.png)
+![Backtest PnL](docs/images/backtest_pnl.png)
 *Figure 11: Strategy performance showing cumulative returns, positions, and drawdown*
 
 **Performance Summary:**
