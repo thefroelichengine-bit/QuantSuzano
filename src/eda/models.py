@@ -267,6 +267,103 @@ def forecast_vecm(vecm_result, steps: int = 10) -> pd.DataFrame:
     return forecast_df
 
 
+def diag_residuals(
+    resid: pd.Series,
+    lags: int = 20,
+    out_path: str = None,
+) -> tuple:
+    """
+    Perform diagnostic tests on residuals.
+    
+    Tests include:
+    - Ljung-Box test for autocorrelation
+    - ARCH LM test for heteroskedasticity
+    
+    Parameters
+    ----------
+    resid : pd.Series
+        Residuals series
+    lags : int
+        Number of lags for tests
+    out_path : str, optional
+        Path to save test results
+    
+    Returns
+    -------
+    tuple
+        (ljung_box_result, arch_result)
+    """
+    from statsmodels.stats.diagnostic import acorr_ljungbox, het_arch
+    
+    print("\n" + "=" * 60)
+    print("RESIDUAL DIAGNOSTIC TESTS")
+    print("=" * 60 + "\n")
+    
+    clean_resid = resid.dropna()
+    
+    if len(clean_resid) < lags * 2:
+        print(f"[WARNING] Too few observations ({len(clean_resid)}) for {lags} lags")
+        lags = max(10, len(clean_resid) // 4)
+    
+    # Ljung-Box test
+    print(f"[TEST] Ljung-Box (autocorrelation, lags={lags})")
+    try:
+        lb_result = acorr_ljungbox(clean_resid, lags=[lags], return_df=True)
+        lb_pval = lb_result["lb_pvalue"].iloc[-1]
+        print(f"  P-value: {lb_pval:.4f}")
+        
+        if lb_pval < 0.05:
+            print(f"  [WARNING] Significant autocorrelation detected (p < 0.05)")
+        else:
+            print(f"  [OK] No significant autocorrelation")
+    except Exception as e:
+        print(f"  [ERROR] Ljung-Box test failed: {e}")
+        lb_result = None
+    
+    # ARCH LM test
+    print(f"\n[TEST] ARCH LM (heteroskedasticity, lags={lags})")
+    try:
+        arch_result = het_arch(clean_resid, nlags=lags)
+        arch_lm, arch_pval = arch_result[0], arch_result[1]
+        print(f"  LM statistic: {arch_lm:.4f}")
+        print(f"  P-value: {arch_pval:.4f}")
+        
+        if arch_pval < 0.05:
+            print(f"  [WARNING] Significant ARCH effects detected (p < 0.05)")
+        else:
+            print(f"  [OK] No significant ARCH effects")
+    except Exception as e:
+        print(f"  [ERROR] ARCH test failed: {e}")
+        arch_result = None
+    
+    # Save results
+    if out_path:
+        with open(out_path, "w") as f:
+            f.write("=" * 60 + "\n")
+            f.write("RESIDUAL DIAGNOSTIC TESTS\n")
+            f.write("=" * 60 + "\n\n")
+            
+            f.write(f"Sample size: {len(clean_resid)}\n")
+            f.write(f"Lags tested: {lags}\n\n")
+            
+            if lb_result is not None:
+                f.write("Ljung-Box Test (Autocorrelation):\n")
+                f.write(f"  P-value: {lb_pval:.6f}\n")
+                f.write(f"  Result: {'FAIL (autocorrelation present)' if lb_pval < 0.05 else 'PASS'}\n\n")
+            
+            if arch_result is not None:
+                f.write("ARCH LM Test (Heteroskedasticity):\n")
+                f.write(f"  LM statistic: {arch_lm:.6f}\n")
+                f.write(f"  P-value: {arch_pval:.6f}\n")
+                f.write(f"  Result: {'FAIL (ARCH effects present)' if arch_pval < 0.05 else 'PASS'}\n")
+        
+        print(f"\n[SAVED] Test results: {out_path}")
+    
+    print("=" * 60 + "\n")
+    
+    return lb_result, arch_result
+
+
 if __name__ == "__main__":
     # Test VECM
     print("\n=== Testing VECM Models ===\n")

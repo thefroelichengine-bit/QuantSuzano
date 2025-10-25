@@ -1,0 +1,104 @@
+{
+  "comment": "Configuration file for QuantSuzano data pipeline",
+  "comment2": "Copy this file to config.json and fill in your settings",
+  
+  "data": {
+    "start_date": "2020-01-01",
+    "business_frequency": "B",
+    "rolling_window": 60,
+    "z_threshold": 2.0
+  },
+  
+  "scrapers": {
+    "cache_ttl_hours": 24,
+    "retry_attempts": 3,
+    "rate_limit_seconds": 0.5
+  },
+  
+  "pipeline": {
+    "continue_on_error": true,
+    "version_keep_last_n": 10,
+    "max_age_hours": 48
+  },
+  
+  "alerting": {
+    "email": {
+      "enabled": false,
+      "smtp_server": "smtp.gmail.com",
+      "smtp_port": 587,
+      "username": "your_email@gmail.com",
+      "password": "your_app_password",
+      "from_addr": "your_email@gmail.com",
+      "to_addrs": ["recipient@example.com"]
+    },
+    "slack": {
+      "enabled": false,
+      "webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+    },
+    "log_file": {
+      "enabled": true,
+      "path": "data/logs/alerts.jsonl"
+    }
+  },
+  
+  "sources": {
+    "ptax": {
+      "enabled": true,
+      "required": true,
+      "update_frequency_hours": 24
+    },
+    "selic": {
+      "enabled": true,
+      "required": true,
+      "update_frequency_hours": 24
+    },
+    "suzb3": {
+      "enabled": true,
+      "required": true,
+      "update_frequency_hours": 1,
+      "ticker": "SUZB3.SA"
+    },
+    "climate_nasa": {
+      "enabled": true,
+      "required": false,
+      "update_frequency_hours": 168,
+      "locations": ["tres_lagoas", "imperatriz"]
+    },
+    "climate_inmet": {
+      "enabled": false,
+      "required": false,
+      "update_frequency_hours": 24,
+      "comment": "INMET API may have restrictions"
+    },
+    "pulp_prices": {
+      "enabled": true,
+      "required": false,
+      "manual_upload": true,
+      "comment": "FOEX pulp prices require manual upload"
+    }
+  },
+  
+  "validation": {
+    "check_missing": true,
+    "check_outliers": true,
+    "check_duplicates": true,
+    "check_freshness": true,
+    "outlier_std": 5.0
+  },
+  
+  "model": {
+    "synthetic_index": {
+      "train_ratio": 0.70,
+      "val_ratio": 0.15,
+      "noise_alpha": 0.10,
+      "cv_splits": 5,
+      "regularization_alphas": [0.01, 0.1, 1.0, 10.0, 100.0]
+    },
+    "vecm": {
+      "deterministic": "ci",
+      "k_ar_diff": 1,
+      "max_lags": 10
+    }
+  }
+}
+

@@ -1,0 +1,47 @@
+{
+  "ptax_20251025_171924": {
+    "version_id": "ptax_20251025_171924",
+    "timestamp": "2025-10-25T17:19:24.154976",
+    "source": "ptax",
+    "rows": 1461,
+    "columns": 1,
+    "hash": "64e63abdf2a0b448",
+    "start_date": "2020-01-02 00:00:00",
+    "end_date": "2025-10-24 00:00:00",
+    "metadata": {
+      "update_type": "incremental",
+      "new_rows": 1461,
+      "total_rows": 1461
+    }
+  },
+  "selic_20251025_171942": {
+    "version_id": "selic_20251025_171942",
+    "timestamp": "2025-10-25T17:19:42.056758",
+    "source": "selic",
+    "rows": 2125,
+    "columns": 1,
+    "hash": "e21d787d431d5c10",
+    "start_date": "2020-01-01 00:00:00",
+    "end_date": "2025-10-25 00:00:00",
+    "metadata": {
+      "update_type": "incremental",
+      "new_rows": 2125,
+      "total_rows": 2125
+    }
+  },
+  "suzb3_20251025_172146": {
+    "version_id": "suzb3_20251025_172146",
+    "timestamp": "2025-10-25T17:21:46.912885",
+    "source": "suzb3",
+    "rows": 1450,
+    "columns": 1,
+    "hash": "564a11d2f00977ec",
+    "start_date": "2020-01-02 00:00:00",
+    "end_date": "2025-10-24 00:00:00",
+    "metadata": {
+      "update_type": "incremental",
+      "new_rows": 1450,
+      "total_rows": 1450
+    }
+  }
+}
