@@ -21,6 +21,12 @@ class BCBExtendedScraper(BaseScraper):
     SERIES_MAP = {
         "ptax": 1,      # USD/BRL exchange rate
         "selic": 432,   # SELIC interest rate
+        "igpm": 189,    # IGP-M inflation index
+        "m1": 27788,    # Money supply M1
+        "m2": 27810,    # Money supply M2
+        "trade_balance": 22707,  # Trade balance (US$ million)
+        "fx_reserves": 3546,  # International reserves (US$ million)
+        "industrial_production": 21859,  # Industrial production index
     }
     
     def __init__(self, **kwargs):

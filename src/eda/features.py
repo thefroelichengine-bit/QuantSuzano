@@ -8,10 +8,12 @@ from .loaders import (
     load_climate,
     load_credit,
     load_equity,
+    load_oil,
     load_ptax_sgs,
     load_pulp_usd,
     load_selic_sgs,
 )
+from .loaders_benchmarks import load_all_benchmarks
 
 
 def build_features(start: str = "2020-01-01", end: str = None) -> pd.DataFrame:
@@ -70,6 +72,13 @@ def build_features(start: str = "2020-01-01", end: str = None) -> pd.DataFrame:
         print(f"[ERROR] Failed to load pulp: {e}")
     
     try:
+        oil = load_oil(start=start, end=end)
+        if not oil.empty:
+            dfs.append(oil)
+    except Exception as e:
+        print(f"[ERROR] Failed to load oil: {e}")
+    
+    try:
         climate = load_climate()
         dfs.append(climate)
     except Exception as e:
@@ -80,6 +89,14 @@ def build_features(start: str = "2020-01-01", end: str = None) -> pd.DataFrame:
         dfs.append(credit)
     except Exception as e:
         print(f"[ERROR] Failed to load credit: {e}")
+    
+    # Load benchmark indices
+    try:
+        benchmarks = load_all_benchmarks(start=start, end=end)
+        if not benchmarks.empty:
+            dfs.append(benchmarks)
+    except Exception as e:
+        print(f"[ERROR] Failed to load benchmarks: {e}")
     
     if not dfs:
         raise ValueError("No data sources loaded successfully!")
@@ -104,10 +121,16 @@ def build_features(start: str = "2020-01-01", end: str = None) -> pd.DataFrame:
         df["pulp_brl"] = df["pulp_usd"] * df["ptax"]
         print(f"[OK] pulp_brl created (range: {df['pulp_brl'].min():.2f} - {df['pulp_brl'].max():.2f})")
     
+    # Create oil_brl if both oil_usd and ptax exist
+    if "oil_usd" in df.columns and "ptax" in df.columns:
+        print("\n[FEATURE] Creating oil_brl = oil_usd * ptax...")
+        df["oil_brl"] = df["oil_usd"] * df["ptax"]
+        print(f"[OK] oil_brl created (range: {df['oil_brl'].min():.2f} - {df['oil_brl'].max():.2f})")
+    
     # Compute log returns for all numeric columns
     print("\n[FEATURE] Computing log returns...")
     
-    return_cols = ["ptax", "selic", "pulp_brl", "suzb", "credit", "precip_mm", "ndvi"]
+    return_cols = ["ptax", "selic", "pulp_brl", "oil_brl", "suzb", "credit", "precip_mm", "ndvi", "imat", "iagro", "ibov"]
     for col in return_cols:
         if col in df.columns:
             # Compute log return
@@ -128,6 +151,53 @@ def build_features(start: str = "2020-01-01", end: str = None) -> pd.DataFrame:
         if "ndvi" in df.columns:
             df[f"ndvi_l{lag}"] = df["ndvi"].shift(lag)
             print(f"  [OK] ndvi_l{lag}")
+    
+    # Momentum indicators
+    if "suzb" in df.columns:
+        print("\n[FEATURE] Creating momentum indicators...")
+        
+        # Momentum periods
+        df["mom_5"] = df["suzb"].pct_change(5)
+        df["mom_20"] = df["suzb"].pct_change(20)
+        df["mom_60"] = df["suzb"].pct_change(60)
+        print("  [OK] mom_5, mom_20, mom_60")
+        
+        # RSI (Relative Strength Index)
+        def calculate_rsi(prices, period=14):
+            delta = prices.diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+            rs = gain / (loss + 1e-10)  # Avoid division by zero
+            return 100 - (100 / (1 + rs))
+        
+        df["rsi_14"] = calculate_rsi(df["suzb"], 14)
+        print("  [OK] rsi_14")
+        
+        # Volatility regime
+        if "suzb_r" in df.columns:
+            df["vol_20"] = df["suzb_r"].rolling(20).std()
+            vol_median = df["vol_20"].median()
+            df["vol_regime"] = np.where(df["vol_20"] > vol_median, 1, 0)  # 1=high, 0=low
+            print(f"  [OK] vol_20, vol_regime (median: {vol_median:.6f})")
+        
+        # Trend strength (linear regression slope)
+        from scipy.stats import linregress
+        def calc_trend(prices):
+            if len(prices) < 20 or prices.isna().any():
+                return np.nan
+            return linregress(range(len(prices)), prices).slope
+        
+        df["trend_20"] = df["suzb"].rolling(20).apply(calc_trend, raw=False)
+        print("  [OK] trend_20")
+        
+        # EMA and gap
+        df["ema_20"] = df["suzb"].ewm(span=20, adjust=False).mean()
+        df["ema_gap"] = (df["suzb"] - df["ema_20"]) / df["suzb"]
+        print("  [OK] ema_20, ema_gap")
+        
+        # Forward-looking target for momentum strategies
+        df["target_fwd5"] = df["suzb"].pct_change(5).shift(-5)
+        print("  [OK] target_fwd5 (5-day forward return)")
     
     # Summary statistics
     print("\n" + "=" * 60)

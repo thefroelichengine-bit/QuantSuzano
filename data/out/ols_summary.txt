@@ -1,0 +1,30 @@
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                 suzb_r   R-squared:                       0.417
+Model:                            OLS   Adj. R-squared:                  0.415
+Method:                 Least Squares   F-statistic:                     180.2
+Date:                Sat, 25 Oct 2025   Prob (F-statistic):          4.55e-173
+Time:                        16:09:54   Log-Likelihood:                 5805.7
+No. Observations:                1516   AIC:                        -1.160e+04
+Df Residuals:                    1509   BIC:                        -1.156e+04
+Df Model:                           6                                         
+Covariance Type:            nonrobust                                         
+===============================================================================
+                  coef    std err          t      P>|t|      [0.025      0.975]
+-------------------------------------------------------------------------------
+const           0.0003      0.000      1.901      0.058   -8.26e-06       0.001
+ptax_r         -1.1191      0.050    -22.450      0.000      -1.217      -1.021
+selic_r        -0.0007      0.007     -0.102      0.919      -0.014       0.013
+pulp_brl_r      1.1304      0.047     23.848      0.000       1.037       1.223
+credit_r        0.0067      0.067      0.099      0.921      -0.126       0.139
+precip_mm_r     0.0106      0.006      1.797      0.072      -0.001       0.022
+ndvi_r         -0.2012      0.047     -4.258      0.000      -0.294      -0.109
+==============================================================================
+Omnibus:                      728.853   Durbin-Watson:                   2.056
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):           636941.404
+Skew:                           0.722   Prob(JB):                         0.00
+Kurtosis:                     103.406   Cond. No.                         649.
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.

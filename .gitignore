@@ -33,7 +33,6 @@ env/
 
 # Data files (generated)
 data/interim/*
-data/out/*
 !data/interim/.gitkeep
 !data/out/.gitkeep
 

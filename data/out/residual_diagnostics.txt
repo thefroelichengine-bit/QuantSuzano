@@ -1,0 +1,15 @@
+============================================================
+RESIDUAL DIAGNOSTIC TESTS
+============================================================
+
+Sample size: 704
+Lags tested: 20
+
+Ljung-Box Test (Autocorrelation):
+  P-value: 0.493170
+  Result: PASS
+
+ARCH LM Test (Heteroskedasticity):
+  LM statistic: 5.658086
+  P-value: 0.999287
+  Result: PASS

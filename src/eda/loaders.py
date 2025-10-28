@@ -68,9 +68,11 @@ def load_equity(
         
         # Extract close price and rename
         df = df[["Close"]].rename(columns={"Close": "suzb"})
-        df.index = pd.to_datetime(df.index).date
-        df.index = pd.to_datetime(df.index)
         df.index.name = "date"
+        
+        # Strip timezone to avoid merge issues
+        if df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
         
         print(f"[OK] Loaded {len(df)} rows from Yahoo Finance")
         return df
@@ -249,6 +251,62 @@ def load_climate() -> pd.DataFrame:
     
     print(f"[OK] Loaded {len(df)} rows")
     return df[required_cols]
+
+
+def load_oil(
+    start: str = DEFAULT_START_DATE,
+    end: Optional[str] = None,
+) -> pd.DataFrame:
+    """
+    Load oil prices from Yahoo Finance (WTI Crude Oil).
+    
+    Falls back to CSV if API fails. Oil prices serve as a proxy for
+    gasoline prices and energy costs.
+    
+    Parameters
+    ----------
+    start : str
+        Start date (YYYY-MM-DD)
+    end : str, optional
+        End date (YYYY-MM-DD), defaults to today
+    
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with 'oil_usd' column (WTI crude price) indexed by date
+    """
+    print("[LOAD] Loading oil prices (WTI Crude)...")
+    
+    try:
+        # WTI Crude Oil futures ticker on Yahoo Finance
+        ticker = "CL=F"
+        oil = yf.Ticker(ticker)
+        df = oil.history(start=start, end=end, auto_adjust=True)
+        
+        if df.empty:
+            raise ValueError(f"No data returned for {ticker}")
+        
+        # Extract close price and rename
+        df = df[["Close"]].rename(columns={"Close": "oil_usd"})
+        df.index.name = "date"
+        
+        # Strip timezone to avoid merge issues
+        if df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+        
+        print(f"[OK] Loaded {len(df)} rows from Yahoo Finance")
+        return df
+    
+    except Exception as e:
+        print(f"[WARN] Yahoo Finance failed: {e}")
+        print("[FALLBACK] Attempting CSV fallback...")
+        try:
+            df = _read_csv_fallback("oil_usd", value_col="Close")
+            print(f"[OK] Loaded {len(df)} rows from CSV")
+            return df
+        except FileNotFoundError as csv_err:
+            print(f"[ERROR] Failed to load oil: {csv_err}")
+            return pd.DataFrame()
 
 
 def load_credit() -> pd.DataFrame:

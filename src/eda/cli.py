@@ -22,6 +22,23 @@ from .pipeline.scheduler import DataScheduler
 from .pipeline.alerting import AlertManager
 from .pipeline.manual_upload import ManualUploadManager
 
+# Risk management imports
+from .risk import (
+    calculate_historical_volatility,
+    fit_garch_model,
+    calculate_var,
+    calculate_cvar,
+    calculate_drawdowns,
+    calculate_risk_metrics,
+)
+
+# Forecasting imports
+from .forecasting import (
+    fit_arima,
+    auto_arima_select,
+    forecast_arima,
+)
+
 app = typer.Typer(
     name="eda",
     help="EDA Suzano - Exploratory Data Analysis CLI",
@@ -50,10 +67,10 @@ def ingest(
         df = build_features(start=start, end=end)
         
         # Create output directory
-        DATA_INT.mkdir(parents=True, exist_ok=True)
+        DATA_OUT.mkdir(parents=True, exist_ok=True)
         
         # Save to parquet
-        output_path = DATA_INT / "merged.parquet"
+        output_path = DATA_OUT / "merged.parquet"
         df.to_parquet(output_path)
         
         typer.echo(f"\n[SUCCESS] Data saved to: {output_path}")
@@ -83,7 +100,7 @@ def synthetic(
     try:
         # Load data
         if input_file is None:
-            input_file = DATA_INT / "merged.parquet"
+            input_file = DATA_OUT / "merged.parquet"
         else:
             input_file = Path(input_file)
         
@@ -166,7 +183,7 @@ def vecm(
     try:
         # Load data
         if input_file is None:
-            input_file = DATA_INT / "merged.parquet"
+            input_file = DATA_OUT / "merged.parquet"
         else:
             input_file = Path(input_file)
         
@@ -250,7 +267,7 @@ def report(
     try:
         # Load data
         if input_file is None:
-            input_file = DATA_INT / "merged.parquet"
+            input_file = DATA_OUT / "merged.parquet"
         else:
             input_file = Path(input_file)
         
@@ -320,7 +337,7 @@ def all(
     typer.echo("[SUCCESS] COMPLETE PIPELINE FINISHED!")
     typer.echo("=" * 70)
     typer.echo("\n[OUTPUTS]:")
-    typer.echo(f"   - Data: {DATA_INT}/merged.parquet")
+    typer.echo(f"   - Data: {DATA_OUT}/merged.parquet")
     typer.echo(f"   - Results: {DATA_OUT}/")
     typer.echo(f"   - Plots: {PLOTS_DIR}/")
 
@@ -349,7 +366,7 @@ def synthetic_robust(
     
     try:
         # Load data
-        input_file = DATA_INT / "merged.parquet"
+        input_file = DATA_OUT / "merged.parquet"
         typer.echo(f"\n[LOADING] Data from: {input_file}")
         df = pd.read_parquet(input_file)
         
@@ -531,7 +548,7 @@ def all_robust(
     typer.echo("[SUCCESS] ROBUST PIPELINE FINISHED!")
     typer.echo("=" * 70)
     typer.echo("\n[OUTPUTS]:")
-    typer.echo(f"   - Data: {DATA_INT}/merged.parquet")
+    typer.echo(f"   - Data: {DATA_OUT}/merged.parquet")
     typer.echo(f"   - Results: {DATA_OUT}/")
     typer.echo(f"   - Robust Results: {DATA_OUT}/synthetic_robust.parquet")
     typer.echo(f"   - Metrics: {DATA_OUT}/metrics_robust.csv")
@@ -835,6 +852,514 @@ def scheduler_export_cron(
         
     except Exception as e:
         typer.echo(f"\n[ERROR] Export failed: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+# =============================================================================
+# RISK MANAGEMENT COMMANDS
+# =============================================================================
+
+@app.command(name="risk-analysis")
+def risk_analysis(
+    input_file: str = None,
+    confidence: float = 0.95,
+):
+    """
+    Comprehensive risk analysis: volatility, VaR, drawdowns, metrics.
+    
+    Args:
+        input_file: Path to data file (default: data/interim/merged.parquet)
+        confidence: Confidence level for VaR (default: 0.95)
+    """
+    typer.echo("\n" + "=" * 70)
+    typer.echo("[RISK] Running comprehensive risk analysis")
+    typer.echo("=" * 70)
+    
+    try:
+        # Load data
+        if input_file is None:
+            input_file = DATA_INT / "merged.parquet"
+        
+        df = pd.read_parquet(input_file)
+        returns = df['suzb_r'].dropna()
+        
+        typer.echo(f"\n[LOADING] {len(returns)} return observations")
+        
+        # 1. Volatility analysis
+        typer.echo("\n[VOLATILITY] Calculating volatility metrics...")
+        vol_21d = calculate_historical_volatility(returns, window=21)
+        vol_252d = calculate_historical_volatility(returns, window=252)
+        
+        typer.echo(f"  Current volatility (21d): {vol_21d.iloc[-1]:.2%}")
+        typer.echo(f"  Current volatility (252d): {vol_252d.iloc[-1]:.2%}")
+        
+        # 2. VaR/CVaR
+        typer.echo(f"\n[VAR] Calculating Value at Risk ({confidence:.0%} confidence)...")
+        var_hist = calculate_var(returns, confidence, method='historical')
+        cvar_hist = calculate_cvar(returns, confidence, method='historical')
+        
+        typer.echo(f"  VaR (historical): {var_hist:.2%}")
+        typer.echo(f"  CVaR (historical): {cvar_hist:.2%}")
+        
+        # 3. Drawdowns
+        typer.echo("\n[DRAWDOWNS] Analyzing drawdowns...")
+        from .risk.drawdowns import calculate_drawdown_stats
+        dd_stats = calculate_drawdown_stats(returns)
+        
+        typer.echo(f"  Max drawdown: {dd_stats['max_drawdown']:.2%}")
+        typer.echo(f"  Max DD date: {dd_stats['max_drawdown_date']}")
+        typer.echo(f"  Average drawdown: {dd_stats['avg_drawdown']:.2%}")
+        typer.echo(f"  Current drawdown: {dd_stats['current_drawdown']:.2%}")
+        
+        # 4. Comprehensive metrics
+        typer.echo("\n[METRICS] Calculating risk metrics...")
+        metrics = calculate_risk_metrics(returns)
+        
+        typer.echo(f"  Sharpe ratio: {metrics['sharpe_ratio']:.2f}")
+        typer.echo(f"  Sortino ratio: {metrics['sortino_ratio']:.2f}")
+        typer.echo(f"  Calmar ratio: {metrics['calmar_ratio']:.2f}")
+        typer.echo(f"  Omega ratio: {metrics['omega_ratio']:.2f}")
+        
+        # Save results
+        DATA_OUT.mkdir(parents=True, exist_ok=True)
+        results_path = DATA_OUT / "risk_analysis.csv"
+        pd.Series(metrics).to_csv(results_path)
+        
+        typer.echo(f"\n[SAVED] Risk metrics: {results_path}")
+        
+    except Exception as e:
+        typer.echo(f"\n[ERROR] Risk analysis failed: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command(name="forecast-arima")
+def forecast_arima_cmd(
+    input_file: str = None,
+    horizon: int = 30,
+    auto_select: bool = True,
+):
+    """
+    ARIMA forecast for SUZB3 returns.
+    
+    Args:
+        input_file: Path to data file
+        horizon: Forecast horizon in days
+        auto_select: Use automatic model selection
+    """
+    typer.echo("\n" + "=" * 70)
+    typer.echo("[FORECAST] ARIMA time series forecasting")
+    typer.echo("=" * 70)
+    
+    try:
+        # Load data
+        if input_file is None:
+            input_file = DATA_INT / "merged.parquet"
+        
+        df = pd.read_parquet(input_file)
+        returns = df['suzb_r'].dropna()
+        
+        typer.echo(f"\n[LOADING] {len(returns)} observations")
+        
+        if auto_select:
+            typer.echo("\n[AUTO] Selecting best ARIMA model...")
+            from .forecasting.classical import auto_arima_select
+            
+            best_model = auto_arima_select(
+                returns,
+                max_p=3,
+                max_q=3,
+                max_d=1,
+                seasonal=False
+            )
+            
+            typer.echo(f"  Best order: {best_model['order']}")
+            typer.echo(f"  AIC: {best_model['aic']:.2f}")
+            typer.echo(f"  BIC: {best_model['bic']:.2f}")
+            
+            result = best_model['result']
+        
+        else:
+            typer.echo("\n[ARIMA] Fitting ARIMA(1,0,1)...")
+            result, fitted, residuals = fit_arima(returns, order=(1, 0, 1))
+        
+        # Generate forecast
+        typer.echo(f"\n[FORECAST] Generating {horizon}-day forecast...")
+        forecast_df = forecast_arima(result, horizon=horizon)
+        
+        typer.echo(f"\n  Next 5 days forecast:")
+        for i in range(min(5, horizon)):
+            fc = forecast_df.iloc[i]
+            typer.echo(f"    Day {i+1}: {fc['forecast']:.4f} [{fc['lower']:.4f}, {fc['upper']:.4f}]")
+        
+        # Save
+        DATA_OUT.mkdir(parents=True, exist_ok=True)
+        forecast_path = DATA_OUT / "arima_forecast.csv"
+        forecast_df.to_csv(forecast_path)
+        
+        typer.echo(f"\n[SAVED] Forecast: {forecast_path}")
+        
+    except Exception as e:
+        typer.echo(f"\n[ERROR] Forecast failed: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command(name="fetch-fundamentals")
+def fetch_fundamentals():
+    """
+    Fetch Suzano fundamental data (financials, ratios).
+    """
+    typer.echo("\n" + "=" * 70)
+    typer.echo("[FUNDAMENTALS] Fetching Suzano company data")
+    typer.echo("=" * 70)
+    
+    try:
+        from .scrapers import registry
+        
+        # Get fundamentals scraper
+        scraper = registry.get("fundamentals")
+        
+        # Fetch all financials
+        typer.echo("\n[FETCHING] Financial statements...")
+        financials = scraper._fetch_all_financials(scraper._fetch_data.__self__)
+        
+        # Calculate ratios
+        typer.echo("\n[CALCULATING] Financial ratios...")
+        ratios = scraper.calculate_financial_ratios(financials)
+        
+        # Get key metrics
+        metrics = scraper.get_key_metrics_series(financials)
+        
+        # Save
+        DATA_OUT.mkdir(parents=True, exist_ok=True)
+        
+        if not ratios.empty:
+            ratios_path = DATA_OUT / "financial_ratios.csv"
+            ratios.to_csv(ratios_path)
+            typer.echo(f"[SAVED] Ratios: {ratios_path}")
+        
+        if not metrics.empty:
+            metrics_path = DATA_OUT / "key_metrics.csv"
+            metrics.to_csv(metrics_path)
+            typer.echo(f"[SAVED] Metrics: {metrics_path}")
+            
+            typer.echo(f"\n[SUMMARY] Latest metrics:")
+            if len(metrics) > 0:
+                latest = metrics.iloc[-1]
+                for col in metrics.columns:
+                    val = latest[col]
+                    if not pd.isna(val):
+                        typer.echo(f"  {col}: {val:,.0f}")
+        
+    except Exception as e:
+        typer.echo(f"\n[ERROR] Fundamentals fetch failed: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command(name="fetch-macro")
+def fetch_macro(
+    source: str = "ibge",
+    series: str = "ipca",
+):
+    """
+    Fetch macro data (inflation, GDP, etc.).
+    
+    Args:
+        source: Data source ('ibge' or 'bcb')
+        series: Series name (e.g., 'ipca', 'gdp')
+    """
+    typer.echo("\n" + "=" * 70)
+    typer.echo(f"[MACRO] Fetching {series} from {source}")
+    typer.echo("=" * 70)
+    
+    try:
+        from .scrapers import registry
+        from datetime import datetime
+        
+        # Get scraper
+        if source == "ibge":
+            scraper = registry.get("ibge_macro")
+        elif source == "bcb":
+            scraper = registry.get("bcb_extended")
+        else:
+            raise ValueError(f"Unknown source: {source}")
+        
+        # Fetch
+        end_date = datetime.now().strftime("%Y-%m-%d")
+        df = scraper.fetch(
+            start_date="2020-01-01",
+            end_date=end_date,
+            series=series
+        )
+        
+        typer.echo(f"\n[SUCCESS] Fetched {len(df)} observations")
+        typer.echo(f"  Date range: {df.index.min()} to {df.index.max()}")
+        
+        # Save
+        DATA_OUT.mkdir(parents=True, exist_ok=True)
+        output_path = DATA_OUT / f"macro_{source}_{series}.csv"
+        df.to_csv(output_path)
+        
+        typer.echo(f"\n[SAVED] {output_path}")
+        
+    except Exception as e:
+        typer.echo(f"\n[ERROR] Macro fetch failed: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command(name="data-quality")
+def data_quality(
+    input_file: str = None,
+):
+    """
+    Run comprehensive data quality assessment.
+    """
+    typer.echo("\n" + "=" * 70)
+    typer.echo("[DATA QUALITY] Running assessment")
+    typer.echo("=" * 70)
+    
+    try:
+        from .data_quality import run_full_quality_check
+        
+        # Load data
+        if input_file:
+            df = pd.read_parquet(input_file)
+        else:
+            feat_path = DATA_OUT / "merged.parquet"
+            if not feat_path.exists():
+                typer.echo("[ERROR] No merged.parquet found. Run 'ingest' first.", err=True)
+                raise typer.Exit(code=1)
+            df = pd.read_parquet(feat_path)
+        
+        # Run checks
+        results = run_full_quality_check(df)
+        
+        typer.echo(f"\n[SUCCESS] Data quality report generated")
+        typer.echo(f"  Report saved to: {DATA_OUT / 'data_quality_report.csv'}")
+        
+    except Exception as e:
+        typer.echo(f"\n[ERROR] Data quality check failed: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command(name="eda-comprehensive")
+def eda_comprehensive(
+    input_file: str = None,
+):
+    """
+    Run comprehensive exploratory data analysis with 30+ plots.
+    """
+    typer.echo("\n" + "=" * 70)
+    typer.echo("[EDA] Running comprehensive analysis")
+    typer.echo("=" * 70)
+    
+    try:
+        from .exploratory import run_comprehensive_eda
+        
+        # Load data
+        if input_file:
+            df = pd.read_parquet(input_file)
+        else:
+            feat_path = DATA_OUT / "merged.parquet"
+            if not feat_path.exists():
+                typer.echo("[ERROR] No merged.parquet found. Run 'ingest' first.", err=True)
+                raise typer.Exit(code=1)
+            df = pd.read_parquet(feat_path)
+        
+        # Run EDA
+        run_comprehensive_eda(df)
+        
+        typer.echo(f"\n[SUCCESS] Comprehensive EDA complete")
+        typer.echo(f"  Plots saved to: {DATA_OUT / 'plots/eda/'}")
+        
+    except Exception as e:
+        typer.echo(f"\n[ERROR] Comprehensive EDA failed: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command(name="automl-tpot")
+def automl_tpot(
+    input_file: str = None,
+    generations: int = 10,
+    population: int = 50,
+):
+    """
+    Run TPOT AutoML to find best model pipeline.
+    
+    Args:
+        input_file: Input parquet file (default: merged.parquet)
+        generations: Number of GP generations (default: 10, use 50 for thorough search)
+        population: Population size per generation
+    """
+    typer.echo("\n" + "=" * 70)
+    typer.echo("[AUTOML] Starting TPOT optimization")
+    typer.echo("=" * 70)
+    
+    try:
+        from .automl import run_tpot_optimization
+        
+        # Load data
+        if input_file:
+            df = pd.read_parquet(input_file)
+        else:
+            feat_path = DATA_OUT / "merged.parquet"
+            if not feat_path.exists():
+                typer.echo("[ERROR] No merged.parquet found. Run 'ingest' first.", err=True)
+                raise typer.Exit(code=1)
+            df = pd.read_parquet(feat_path)
+        
+        # Run TPOT
+        tpot_model, results = run_tpot_optimization(
+            df,
+            target_col='suzb_r',
+            generations=generations,
+            population_size=population
+        )
+        
+        typer.echo(f"\n[SUCCESS] TPOT optimization complete")
+        typer.echo(f"  Best pipeline saved to: {DATA_OUT / 'tpot_best_pipeline.py'}")
+        typer.echo(f"  Results saved to: {DATA_OUT / 'tpot_results.csv'}")
+        
+    except Exception as e:
+        typer.echo(f"\n[ERROR] TPOT optimization failed: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command(name="model-comparison")
+def model_comparison(
+    input_file: str = None,
+    include_ensemble: bool = True,
+):
+    """
+    Compare multiple models (Ridge, XGBoost, LightGBM, etc.).
+    
+    Args:
+        input_file: Input parquet file (default: merged.parquet)
+        include_ensemble: Whether to create voting ensemble
+    """
+    typer.echo("\n" + "=" * 70)
+    typer.echo("[MODEL COMPARISON] Testing multiple models")
+    typer.echo("=" * 70)
+    
+    try:
+        from .automl import compare_all_models
+        
+        # Load data
+        if input_file:
+            df = pd.read_parquet(input_file)
+        else:
+            feat_path = DATA_OUT / "merged.parquet"
+            if not feat_path.exists():
+                typer.echo("[ERROR] No merged.parquet found. Run 'ingest' first.", err=True)
+                raise typer.Exit(code=1)
+            df = pd.read_parquet(feat_path)
+        
+        # Run comparison
+        comparator, results_df = compare_all_models(
+            df,
+            target_col='suzb_r',
+            create_ensemble=include_ensemble
+        )
+        
+        typer.echo(f"\n[SUCCESS] Model comparison complete")
+        typer.echo(f"  Results saved to: {DATA_OUT / 'model_comparison.csv'}")
+        typer.echo(f"  Plots saved to: {DATA_OUT / 'plots/models/'}")
+        
+    except Exception as e:
+        typer.echo(f"\n[ERROR] Model comparison failed: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command(name="strategy-optimize")
+def strategy_optimize(
+    input_file: str = None,
+):
+    """
+    Optimize strategy parameters using grid search.
+    """
+    typer.echo("\n" + "=" * 70)
+    typer.echo("[STRATEGY] Optimizing parameters")
+    typer.echo("=" * 70)
+    
+    try:
+        from .strategies import optimize_strategy_parameters
+        
+        # Load data with z-scores
+        if input_file:
+            df = pd.read_parquet(input_file)
+        else:
+            synthetic_path = DATA_OUT / "synthetic_robust.parquet"
+            if not synthetic_path.exists():
+                typer.echo("[ERROR] No synthetic_robust.parquet found. Run 'all-robust' first.", err=True)
+                raise typer.Exit(code=1)
+            df = pd.read_parquet(synthetic_path)
+        
+        # Run optimization
+        best_params, results_df = optimize_strategy_parameters(df)
+        
+        typer.echo(f"\n[SUCCESS] Strategy optimization complete")
+        typer.echo(f"  Results saved to: {DATA_OUT / 'strategy_optimization.csv'}")
+        
+    except Exception as e:
+        typer.echo(f"\n[ERROR] Strategy optimization failed: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command(name="benchmark-compare")
+def benchmark_compare(
+    strategy_file: str = None,
+):
+    """
+    Compare strategy performance vs benchmarks.
+    
+    Args:
+        strategy_file: Strategy results parquet (default: backtest_robust.parquet)
+    """
+    typer.echo("\n" + "=" * 70)
+    typer.echo("[BENCHMARK] Comparing strategy vs benchmarks")
+    typer.echo("=" * 70)
+    
+    try:
+        from .strategies import compare_strategies
+        from .loaders_benchmarks import load_all_benchmarks
+        
+        # Load strategy returns
+        if strategy_file:
+            df = pd.read_parquet(strategy_file)
+        else:
+            backtest_path = DATA_OUT / "backtest_robust.parquet"
+            if not backtest_path.exists():
+                typer.echo("[ERROR] No backtest_robust.parquet found. Run 'all-robust' first.", err=True)
+                raise typer.Exit(code=1)
+            df = pd.read_parquet(backtest_path)
+        
+        strategy_returns = df['strategy_return']
+        
+        # Load benchmarks
+        bench_df = load_all_benchmarks(start="2020-01-01")
+        
+        # Calculate benchmark returns
+        benchmark_returns = {}
+        for col in ['imat', 'iagro', 'ibov']:
+            if col in bench_df.columns:
+                bench_returns = np.log(bench_df[col]).diff()
+                benchmark_returns[col.upper()] = bench_returns.reindex(strategy_returns.index)
+        
+        # Add buy-and-hold SUZB3
+        features_path = DATA_OUT / "merged.parquet"
+        if features_path.exists():
+            features_df = pd.read_parquet(features_path)
+            if 'suzb_r' in features_df.columns:
+                benchmark_returns['Buy-and-Hold'] = features_df['suzb_r'].reindex(strategy_returns.index)
+        
+        # Run comparison
+        metrics_df, comparator = compare_strategies(strategy_returns, benchmark_returns)
+        
+        typer.echo(f"\n[SUCCESS] Benchmark comparison complete")
+        typer.echo(f"  Results saved to: {DATA_OUT / 'benchmark_comparison.csv'}")
+        typer.echo(f"  Plot saved to: {DATA_OUT / 'plots/strategies/benchmark_comparison.png'}")
+        
+    except Exception as e:
+        typer.echo(f"\n[ERROR] Benchmark comparison failed: {e}", err=True)
         raise typer.Exit(code=1)
 
 

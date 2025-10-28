@@ -1,9 +1,25 @@
 """Configuration module with paths and constants for EDA Suzano."""
 
+import os
 from pathlib import Path
 
-# Project paths
-ROOT = Path(__file__).resolve().parents[2]
+# Project paths - detect workspace vs installed package
+# If running from installed package, use current working directory
+# Otherwise use the package location
+_module_path = Path(__file__).resolve().parents[2]
+_cwd_path = Path.cwd()
+
+# Check if we're in the workspace (has pyproject.toml) or running from installed package
+if (_cwd_path / "pyproject.toml").exists():
+    ROOT = _cwd_path
+elif (_cwd_path / "src" / "eda").exists():
+    ROOT = _cwd_path
+elif "QuantSuzano" in str(_cwd_path):
+    ROOT = _cwd_path
+else:
+    # Fall back to module path if we can't detect workspace
+    ROOT = _module_path
+
 DATA_RAW = ROOT / "data" / "raw"
 DATA_INT = ROOT / "data" / "interim"
 DATA_OUT = ROOT / "data" / "out"

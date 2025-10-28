@@ -1,0 +1,12 @@
+============================================================
+RIDGE REGRESSION MODEL INFO
+============================================================
+
+Best alpha (regularization): 517.947468
+CV score (neg MSE): -0.000262
+
+Train/Val/Test Metrics:
+  R2: train=0.0447, val=0.0126, test=0.0380
+  MAE: train=0.0111, val=0.0089, test=0.0087
+  RMSE: train=0.0160, val=0.0125, test=0.0125
+  IC: train=0.2527, val=0.2366, test=0.2497
