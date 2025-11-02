@@ -1363,6 +1363,166 @@ def benchmark_compare(
         raise typer.Exit(code=1)
 
 
+@app.command(name="strategy-ensemble")
+def strategy_ensemble(
+    input_file: str = None,
+    voting_method: str = "majority",
+    risk_reward_threshold: float = 1.5,
+    min_vote_agreement: float = 0.6,
+    z_threshold: float = 2.0,
+    transaction_cost: float = 0.001,
+):
+    """
+    Run ensemble voting strategy with risk-reward decision model.
+    
+    Uses TEST data only for signal generation to avoid data leakage.
+    
+    Args:
+        input_file: Input parquet file (default: merged.parquet)
+        voting_method: 'majority', 'weighted', or 'threshold'
+        risk_reward_threshold: Minimum risk-reward ratio to execute trade (default: 1.5)
+        min_vote_agreement: Minimum agreement for threshold voting (default: 0.6)
+        z_threshold: Z-score threshold for signal generation (default: 2.0)
+        transaction_cost: Transaction cost per trade (default: 0.001)
+    """
+    typer.echo("\n" + "=" * 70)
+    typer.echo("[ENSEMBLE STRATEGY] Voting + Risk-Reward Execution")
+    typer.echo("=" * 70)
+    
+    try:
+        from .strategies import EnsembleStrategy
+        
+        # Load data
+        if input_file:
+            df = pd.read_parquet(input_file)
+        else:
+            feat_path = DATA_OUT / "merged.parquet"
+            if not feat_path.exists():
+                typer.echo("[ERROR] No merged.parquet found. Run 'ingest' first.", err=True)
+                raise typer.Exit(code=1)
+            df = pd.read_parquet(feat_path)
+        
+        # Initialize and fit ensemble strategy
+        strategy = EnsembleStrategy(
+            voting_method=voting_method,
+            risk_reward_threshold=risk_reward_threshold,
+            z_threshold=z_threshold,
+            min_vote_agreement=min_vote_agreement,
+        )
+        
+        strategy.fit(df, target_col='suzb_r')
+        
+        # Generate signals
+        signals_df = strategy.generate_signals()
+        
+        # Run backtest
+        metrics, backtest_results = strategy.backtest(
+            signals_df=signals_df,
+            transaction_cost=transaction_cost
+        )
+        
+        # Compare with individual models
+        comparison_df = strategy.compare_with_single_models(
+            signals_df=signals_df,
+            transaction_cost=transaction_cost
+        )
+        
+        # Save results
+        strategy.save_results(
+            signals_df,
+            metrics,
+            backtest_results,
+            comparison_df
+        )
+        
+        typer.echo(f"\n[SUCCESS] Ensemble strategy complete")
+        typer.echo(f"  Signals saved to: {DATA_OUT / 'ensemble_signals.parquet'}")
+        typer.echo(f"  Backtest saved to: {DATA_OUT / 'ensemble_backtest.parquet'}")
+        typer.echo(f"  Metrics saved to: {DATA_OUT / 'ensemble_metrics.csv'}")
+        typer.echo(f"  Comparison saved to: {DATA_OUT / 'ensemble_comparison.csv'}")
+        
+    except Exception as e:
+        typer.echo(f"\n[ERROR] Ensemble strategy failed: {e}", err=True)
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(code=1)
+
+
+@app.command(name="strategy-compare")
+def strategy_compare(
+    input_file: str = None,
+    ensemble_file: str = None,
+    transaction_cost: float = 0.001,
+):
+    """
+    Compare ensemble strategy vs. single model strategies.
+    
+    Args:
+        input_file: Input parquet file (default: merged.parquet)
+        ensemble_file: Pre-computed ensemble signals (default: ensemble_signals.parquet)
+        transaction_cost: Transaction cost per trade
+    """
+    typer.echo("\n" + "=" * 70)
+    typer.echo("[STRATEGY COMPARE] Comparing ensemble vs individual models")
+    typer.echo("=" * 70)
+    
+    try:
+        from .strategies import EnsembleStrategy
+        
+        # Load data
+        if input_file:
+            df = pd.read_parquet(input_file)
+        else:
+            feat_path = DATA_OUT / "merged.parquet"
+            if not feat_path.exists():
+                typer.echo("[ERROR] No merged.parquet found. Run 'ingest' first.", err=True)
+                raise typer.Exit(code=1)
+            df = pd.read_parquet(feat_path)
+        
+        # If ensemble file exists, load and compare
+        if ensemble_file:
+            signals_path = Path(ensemble_file)
+        else:
+            signals_path = DATA_OUT / "ensemble_signals.parquet"
+        
+        if signals_path.exists():
+            typer.echo(f"\n[LOADING] Loading pre-computed ensemble signals from {signals_path}")
+            signals_df = pd.read_parquet(signals_path)
+            
+            # Create strategy instance and compare
+            strategy = EnsembleStrategy()
+            strategy.fit(df, target_col='suzb_r')
+            comparison_df = strategy.compare_with_single_models(
+                signals_df=signals_df,
+                transaction_cost=transaction_cost
+            )
+        else:
+            # Run full ensemble strategy
+            typer.echo("\n[RUNNING] Running full ensemble strategy...")
+            strategy = EnsembleStrategy()
+            strategy.fit(df, target_col='suzb_r')
+            signals_df = strategy.generate_signals()
+            comparison_df = strategy.compare_with_single_models(
+                signals_df=signals_df,
+                transaction_cost=transaction_cost
+            )
+        
+        # Display results
+        typer.echo("\n[COMPARISON] Results:")
+        typer.echo(comparison_df.to_string(index=False))
+        
+        # Save comparison
+        comparison_path = DATA_OUT / "strategy_comparison.csv"
+        comparison_df.to_csv(comparison_path, index=False)
+        typer.echo(f"\n[SAVED] Comparison saved to: {comparison_path}")
+        
+    except Exception as e:
+        typer.echo(f"\n[ERROR] Strategy comparison failed: {e}", err=True)
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":
     app()
 

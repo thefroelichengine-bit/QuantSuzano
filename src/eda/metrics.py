@@ -191,6 +191,35 @@ def max_drawdown(cumulative_returns: pd.Series) -> float:
     return drawdown.min()
 
 
+def calc_information_coefficient(
+    y_true: pd.Series,
+    y_pred: pd.Series,
+) -> float:
+    """
+    Calculate Information Coefficient (IC) - correlation between true and predicted values.
+    
+    Parameters
+    ----------
+    y_true : pd.Series
+        True values
+    y_pred : pd.Series
+        Predicted values
+    
+    Returns
+    -------
+    float
+        Information Coefficient (correlation coefficient)
+    """
+    aligned = pd.DataFrame({"true": y_true, "pred": y_pred}).dropna()
+    if len(aligned) < 2:
+        return 0.0
+    
+    ic = aligned["true"].corr(aligned["pred"])
+    if pd.isna(ic):
+        return 0.0
+    return ic
+
+
 def calculate_all_metrics(
     y_true: pd.Series,
     y_pred: pd.Series,

@@ -1,0 +1,1 @@
+C:\Users\joaoa\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\python.exe: Error while finding module specification for 'eda.cli' (ModuleNotFoundError: No module named 'eda')

@@ -5,11 +5,23 @@ TPOT AutoML for automated machine learning pipeline optimization.
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import TimeSeriesSplit
-from tpot import TPOTRegressor
 from pathlib import Path
 from typing import Tuple
 from ..config import DATA_OUT
 from ..utils_split import temporal_split
+
+# Make TPOT import optional
+try:
+    from tpot import TPOTRegressor
+    HAS_TPOT = True
+except ImportError:
+    HAS_TPOT = False
+    # Create a dummy class to prevent import errors
+    class TPOTRegressor:
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "TPOT is not installed. Install it with: pip install tpot"
+            )
 
 
 def run_tpot_optimization(
@@ -22,9 +34,11 @@ def run_tpot_optimization(
     n_jobs: int = -1,
     random_state: int = 42,
     verbosity: int = 2
-) -> Tuple[TPOTRegressor, dict]:
+) -> Tuple:
     """
     Run TPOT AutoML to find best pipeline.
+    
+    NOTE: TPOT is an optional dependency. Install with: pip install tpot
     
     Parameters
     ----------
@@ -54,6 +68,11 @@ def run_tpot_optimization(
     results : dict
         Results dictionary with metrics and pipeline info
     """
+    if not HAS_TPOT:
+        raise ImportError(
+            "TPOT is not installed. Install it with: pip install tpot"
+        )
+    
     print("\n" + "=" * 70)
     print("TPOT AutoML Optimization")
     print("=" * 70)
